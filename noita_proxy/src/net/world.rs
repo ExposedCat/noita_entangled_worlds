@@ -981,8 +981,15 @@ impl WorldManager {
                 priority,
                 take_auth,
             } => {
+                // A new owner's notification can overtake the old owner's queued deltas.
                 match self.chunk_state.get_mut(&delta.chunk_coord) {
-                    Some(ChunkState::Listening { priority: pri, .. }) => {
+                    Some(ChunkState::Listening {
+                        authority,
+                        priority: pri,
+                    }) => {
+                        if *authority != source {
+                            return;
+                        }
                         *pri = priority;
                         if take_auth {
                             self.emit_msg(
@@ -1000,6 +1007,9 @@ impl WorldManager {
                         my_priority,
                         ..
                     }) => {
+                        if *authority != source {
+                            return;
+                        }
                         if priority > *my_priority {
                             if take_auth {
                                 let rq = WorldNetMessage::RequestAuthority {
@@ -1037,7 +1047,13 @@ impl WorldManager {
             WorldNetMessage::ChunkPacket { chunkpacket } => {
                 for (delta, priority) in chunkpacket {
                     match self.chunk_state.get_mut(&delta.chunk_coord) {
-                        Some(ChunkState::Listening { priority: pri, .. }) => {
+                        Some(ChunkState::Listening {
+                            authority,
+                            priority: pri,
+                        }) => {
+                            if *authority != source {
+                                continue;
+                            }
                             *pri = priority;
                         }
                         Some(ChunkState::WantToGetAuth {
@@ -1045,6 +1061,9 @@ impl WorldManager {
                             my_priority,
                             ..
                         }) => {
+                            if *authority != source {
+                                continue;
+                            }
                             if priority <= *my_priority {
                                 let cs = ChunkState::Listening {
                                     authority: *authority,
@@ -1167,7 +1186,11 @@ impl WorldManager {
             WorldNetMessage::NotifyNewAuthority { chunk } => {
                 debug!("Notified of new authority");
                 let state = self.chunk_state.get_mut(&chunk);
-                if let Some(ChunkState::Listening { authority, .. }) = state {
+                if let Some(
+                    ChunkState::Listening { authority, .. }
+                    | ChunkState::WantToGetAuth { authority, .. },
+                ) = state
+                {
                     *authority = source;
                 } else {
                     debug!("Got notified of new authority, but not a listener");
@@ -3403,4 +3426,48 @@ fn test_cut_perf() {
         total += timer.elapsed().as_micros();
     }
     println!("total micros: {}", total / iters);
+}
+
+#[cfg(test)]
+#[test]
+fn terrain_updates_from_previous_authority_are_ignored() {
+    let path = std::env::temp_dir().join(format!("ew-stale-owner-{}", std::process::id()));
+    let (mut world, _, _, _, _) = WorldManager::new(false, OmniPeerId(3), SaveState::new(&path));
+    let chunk = ChunkCoord(0, 0);
+    world.chunk_state.insert(
+        chunk,
+        ChunkState::Listening {
+            authority: OmniPeerId(1),
+            priority: 0,
+        },
+    );
+    world.handle_msg(OmniPeerId(2), WorldNetMessage::NotifyNewAuthority { chunk });
+    let mut old_terrain = WorldModel::default();
+    old_terrain.apply_chunk_data(chunk, &ChunkData::new(1));
+    let delta = old_terrain.get_chunk_delta(chunk, true).unwrap();
+    let messages = [
+        WorldNetMessage::ChunkPacket {
+            chunkpacket: vec![(delta.clone(), 0)],
+        },
+        WorldNetMessage::ListenUpdate {
+            delta,
+            priority: 0,
+            take_auth: false,
+        },
+    ];
+    let rejected = messages.clone().map(|message| {
+        world.handle_msg(OmniPeerId(1), message);
+        world.get_noita_updates().is_empty()
+    });
+    let accepted = messages.map(|message| {
+        world.handle_msg(OmniPeerId(2), message);
+        !world.get_noita_updates().is_empty()
+    });
+    std::fs::remove_dir_all(path).unwrap();
+    assert_eq!(
+        rejected,
+        [true, true],
+        "the former owner restored stale terrain"
+    );
+    assert_eq!(accepted, [true, true], "current-owner updates were dropped");
 }
