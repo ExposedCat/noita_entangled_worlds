@@ -34,3 +34,7 @@ jobs:
       - name: Run tests (proxy)
         run: cargo test -p noita_proxy
         working-directory: ./noita_proxy
+      - name: Check Linux launcher scripts
+        run: |
+          python3 -B -m unittest discover -s scripts/tests -v
+          bash -n scripts/start-steam-flatpak.sh

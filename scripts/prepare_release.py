@@ -96,6 +96,8 @@ def make_release_assets():
     with ZipFile("target/noita_proxy-linux.zip", "w") as release:
         release.write("noita_proxy/target/x86_64-unknown-linux-gnu/release-lto/noita_proxy", arcname="noita_proxy.x86_64", compress_type=COMPRESS_TYPE, compresslevel=COMPRESS_LEVEL)
         release.write("redist/libsteam_api.so", arcname="libsteam_api.so", compress_type=COMPRESS_TYPE, compresslevel=COMPRESS_LEVEL)
+        for launcher in ("start-steam-flatpak.sh", "steam-session.py"):
+            release.write(f"scripts/{launcher}", arcname=launcher, compress_type=COMPRESS_TYPE, compresslevel=COMPRESS_LEVEL)
 
     print("Writing mod release...")
 

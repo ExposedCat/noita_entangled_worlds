@@ -47,6 +47,31 @@ Now you're ready to start a server and have fun!
 
 Note: The proxy must be launched via terminal with the command above every time you want to play multiplayer.
 
+## Installation on Linux with Steam
+
+Start Noita once from Steam using Proton, then close the game. Extract the Linux proxy release and run `noita_proxy.x86_64` while Steam is running.
+
+### Flatpak Steam
+
+Extract the Linux proxy release where you want it and grant Steam access to that directory:
+
+```bash
+unzip noita_proxy-linux.zip -d entangled-worlds
+cd entangled-worlds
+chmod +x noita_proxy.x86_64 start-steam-flatpak.sh
+flatpak override --user --filesystem="$(pwd -P)" com.valvesoftware.Steam
+```
+
+Fully quit and restart Flatpak Steam to apply the permission, then run:
+
+```bash
+./start-steam-flatpak.sh
+```
+
+Keep Flatpak Steam running and use `start-steam-flatpak.sh` each time. It runs the proxy inside Steam's existing sandbox and accepts the usual proxy arguments.
+
+Enable unsafe mods and Entangled Worlds in Noita as described above.
+
 ## Installation on Linux with Lutris (provided by @merll002)
 
 1. Install the GOG version of Noita through the lutris game installer:
