@@ -237,6 +237,7 @@ local function run_spawn_fn(file, fn, x, y, w, h, is_open_path)
             .. "dofile_once('"
             .. file
             .. "')\n"
+            .. "dofile_once('mods/quant.ew/files/system/wang_hooks/synced_pixel_scenes.lua')\n"
             -- .. "print("..x..","..y..","..w..","..h..",'"..is_open_str.."')\n"
             .. fn
             .. "("
